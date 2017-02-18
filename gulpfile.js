@@ -31,11 +31,13 @@ var uglify = require('gulp-uglify');
 var merge2 = require('merge2');
 var ignore = require('gulp-ignore');
 var rimraf = require('gulp-rimraf');
+var clone = require('gulp-clone');
+var merge = require('gulp-merge');
 var sourcemaps = require('gulp-sourcemaps');
 var browserSync = require('browser-sync').create();
-var reload = browserSync.reload;
+var del = require('del');
 
-// Run: 
+// Run:
 // gulp sass + cssnano + rename
 // Prepare the min.css for production (with 2 pipes to be sure that "child-theme.css" == "child-theme.min.css")
 gulp.task('scss-for-prod', function() {
@@ -46,20 +48,22 @@ gulp.task('scss-for-prod', function() {
 
     var pipe1 = source.pipe(clone())
         .pipe(sourcemaps.write(undefined, { sourceRoot: null }))
+        .pipe(gulp.dest('./css'))
+        .pipe(rename('custom-editor-style.css'))
         .pipe(gulp.dest('./css'));
 
     var pipe2 = source.pipe(clone())
         .pipe(cssnano())
-        .pipe(rename({suffix: '.min'})) 
+        .pipe(rename({suffix: '.min'}))
         .pipe(gulp.dest('./css'));
 
     return merge(pipe1, pipe2);
 });
 
 
-// Run: 
+// Run:
 // gulp sourcemaps + sass + reload(browserSync)
-// Prepare the child-theme.css for the developpment environment
+// Prepare the child-theme.css for the development environment
 gulp.task('scss-for-dev', function() {
     gulp.src('./sass/*.scss')
         .pipe(plumber())
@@ -67,21 +71,23 @@ gulp.task('scss-for-dev', function() {
         .pipe(sass())
         .pipe(sourcemaps.write(undefined, { sourceRoot: null }))
         .pipe(gulp.dest('./css'))
-        .pipe(reload({stream: true}));
 });
 
 gulp.task('watch-scss', ['browser-sync'], function () {
     gulp.watch('./sass/**/*.scss', ['scss-for-dev']);
 });
 
-// Run: 
+// Run:
 // gulp sass
 // Compiles SCSS files in CSS
 gulp.task('sass', function () {
-    gulp.src('./sass/*.scss')
+    var stream = gulp.src('./sass/*.scss')
         .pipe(plumber())
         .pipe(sass())
+        .pipe(gulp.dest('./css'))
+        .pipe(rename('custom-editor-style.css'))
         .pipe(gulp.dest('./css'));
+    return stream;
 });
 
 // Run: 
@@ -103,8 +109,7 @@ gulp.task('cssnano', ['cleancss'], function(){
     .pipe(rename({suffix: '.min'}))
     .pipe(cssnano({discardComments: {removeAll: true}}))
     .pipe(sourcemaps.write('./'))
-    .pipe(gulp.dest('./css/'))
-    .pipe(reload({stream: true}));
+    .pipe(gulp.dest('./css/'));
 }); 
 
 gulp.task('cleancss', function() {
@@ -130,7 +135,6 @@ gulp.task('watch-bs', ['browser-sync', 'watch', 'cssnano'], function () { });
 // Uglifies and concat all JS files into one
 gulp.task('scripts', function() {
     var scripts = [
-        basePaths.dev + 'js/owl.carousel.min.js', // Must be loaded before BS4
         basePaths.dev + 'js/tether.js', // Must be loaded before BS4
 
         // Start - All BS4 stuff
@@ -148,6 +152,11 @@ gulp.task('scripts', function() {
   gulp.src(scripts)
     .pipe(concat('child-theme.js'))
     .pipe(gulp.dest('./js/'));
+});
+
+// Deleting any file inside the /src folder
+gulp.task('clean-source', function () {
+  return del(['src/**/*',]);
 });
 
 // Run: 
@@ -180,18 +189,6 @@ gulp.task('copy-assets', function() {
     gulp.src(basePaths.node + 'font-awesome/scss/*.scss')
         .pipe(gulp.dest(basePaths.dev + '/sass/fontawesome'));
 
-// owl JS files
-    gulp.src(basePaths.node + 'owl.carousel/dist/*.js')
-        .pipe(gulp.dest(basePaths.dev + '/js'));
-
-// Copy all Owl2 SCSS files
-    gulp.src(basePaths.node + 'owl.carousel/src/scss/*.scss')
-       .pipe(gulp.dest(basePaths.dev + '/sass/owl-carousel2'));
-
-// Copy all Owl2 CSS files
-    gulp.src(basePaths.node + 'owl.carousel/dist/assets/*.css')
-        .pipe(gulp.dest(basePaths.dev + '/css'));
-
 // Copy jQuery
     gulp.src(basePaths.node + 'jquery/dist/*.js')
         .pipe(gulp.dest(basePaths.dev + '/js'));
@@ -217,7 +214,25 @@ gulp.task('copy-assets', function() {
 // Run
 // gulp dist
 // Copies the files to the /dist folder for distributon
-gulp.task('dist', function() {
-    gulp.src(['**/*','!sass','!sass/**','!bower_components','!bower_components/**','!node_modules','!node_modules/**','!src','!src/**','!dist','!bower.json', '!gulpfile.js', '!package.json', '*'])
+gulp.task('dist', ['clean-dist'], function() {
+    gulp.src(['**/*','!bower_components','!bower_components/**','!node_modules','!node_modules/**','!src','!src/**','!dist','!dist/**','!sass','!sass/**','!readme.txt','!readme.md','!package.json','!gulpfile.js','!CHANGELOG.md','!.travis.yml','!jshintignore', '!codesniffer.ruleset.xml', '*'])
     .pipe(gulp.dest('dist/'))
+});
+
+// Deleting any file inside the /src folder
+gulp.task('clean-dist', function () {
+  return del(['dist/**/*',]);
+});
+
+// Run
+// gulp dist-product
+// Copies the files to the /dist folder for distributon
+gulp.task('dist-product', ['clean-dist-product'], function() {
+    gulp.src(['**/*','!bower_components','!bower_components/**','!node_modules','!node_modules/**','!src','!src/**','!dist','!dist/**', '*'])
+    .pipe(gulp.dest('dist-product/'))
+});
+
+// Deleting any file inside the /src folder
+gulp.task('clean-dist-product', function () {
+  return del(['dist-product/**/*',]);
 });
